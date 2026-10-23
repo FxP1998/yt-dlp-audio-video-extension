@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Download YouTube media with yt-dlp using quality-capped presets."""
+
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Download best-quality audio with an embedded thumbnail, or "
+            "the best video up to 1440p."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  download audio 'https://www.youtube.com/watch?v=VIDEO_ID'\n"
+            "  download video --browser firefox 'https://youtu.be/VIDEO_ID'\n"
+            "  download video --browser chromium --profile Default URL"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("mode", choices=("audio", "video"))
+    parser.add_argument(
+        "--browser",
+        choices=("firefox", "chromium"),
+        help="Use cookies from this browser when a video requires login.",
+    )
+    parser.add_argument(
+        "--profile",
+        help="Browser profile name/path (use with --browser).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path.home() / "Downloads" / "yt-dlp",
+        help="Download root folder (default: ~/Downloads/yt-dlp).",
+    )
+    parser.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Check extraction and format selection without downloading files.",
+    )
+    parser.add_argument("urls", nargs="+", metavar="URL")
+    args = parser.parse_args()
+    if args.profile and not args.browser:
+        parser.error("--profile requires --browser")
+    return args
+
+
+def main():
+    args = parse_args()
+    ytdlp = shutil.which("yt-dlp")
+    if not ytdlp:
+        print(
+            "Error: yt-dlp is not installed or not on PATH. "
+            "Install yt-dlp, then run this script again.",
+            file=sys.stderr,
+        )
+        return 127
+    if not shutil.which("ffmpeg"):
+        print(
+            "Error: ffmpeg is required for merging video/audio and embedding "
+            "audio thumbnails.",
+            file=sys.stderr,
+        )
+        return 127
+    if args.mode == "audio":
+        mutagen_check = subprocess.run(
+            [sys.executable, "-c", "import mutagen"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if mutagen_check.returncode:
+            print(
+                "Error: audio thumbnail embedding requires the Python "
+                "'mutagen' package.\n"
+                "On Arch Linux, install it with: sudo pacman -S python-mutagen",
+                file=sys.stderr,
+            )
+            return 127
+
+    output_dir = args.output_dir.expanduser() / (
+        "Audio" if args.mode == "audio" else "Videos"
+    )
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        print(f"Error: cannot create output directory: {error}", file=sys.stderr)
+        return 1
+
+    command = [
+        ytdlp,
+        "--no-playlist",
+        "--newline",
+        "--embed-metadata",
+        "--output",
+        str(output_dir / "%(title)s [%(id)s].%(ext)s"),
+    ]
+    if shutil.which("node"):
+        command.extend(("--js-runtimes", "node"))
+
+    if args.mode == "audio":
+        command.extend(
+            (
+                "--format",
+                "bestaudio",
+                "--extract-audio",
+                "--audio-format",
+                "opus",
+                "--audio-quality",
+                "0",
+                "--embed-thumbnail",
+            )
+        )
+    else:
+        command.extend(
+            (
+                "--format",
+                "bestvideo[height<=1440]+bestaudio/best[height<=1440]",
+            )
+        )
+
+    if args.browser:
+        browser = args.browser
+        if args.profile:
+            browser = f"{browser}:{args.profile}"
+        command.extend(("--cookies-from-browser", browser))
+
+    if args.simulate:
+        command.append("--simulate")
+    command.extend(("--", *args.urls))
+    try:
+        return subprocess.run(command, check=False).returncode
+    except OSError as error:
+        print(f"Error: could not start yt-dlp: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

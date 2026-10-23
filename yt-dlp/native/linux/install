@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Register the yt-dlp native host for Firefox and Chromium on Linux."""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+
+NAME = "com.broken.ytdlp"
+ROOT = Path(__file__).resolve().parents[2]
+HOST = Path(__file__).resolve().with_name("host")
+FIREFOX_EXTENSIONS = [
+    "yt-dlp-audio@broken.local",
+    "yt-dlp-video@broken.local",
+]
+CHROMIUM_ORIGINS = [
+    "chrome-extension://kbcjajcfgfmnajlbbngooeamocbbhigm/",
+    "chrome-extension://inonagcohgljchagbchjolfdfflokokc/",
+]
+
+
+def register(path, manifest):
+    path.mkdir(parents=True, exist_ok=True)
+    target = path / f"{NAME}.json"
+    target.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    target.chmod(0o644)
+    print(f"Registered: {target}")
+
+
+def main():
+    if not HOST.is_file() or not os.access(HOST, os.X_OK):
+        print(f"Native host is missing or not executable: {HOST}", file=sys.stderr)
+        return 1
+
+    firefox_manifest = {
+        "name": NAME,
+        "description": "Downloads YouTube media with yt-dlp",
+        "path": str(HOST),
+        "type": "stdio",
+        "allowed_extensions": FIREFOX_EXTENSIONS,
+    }
+    chromium_manifest = {
+        "name": NAME,
+        "description": "Downloads YouTube media with yt-dlp",
+        "path": str(HOST),
+        "type": "stdio",
+        "allowed_origins": CHROMIUM_ORIGINS,
+    }
+    register(Path.home() / ".mozilla/native-messaging-hosts", firefox_manifest)
+    register(Path.home() / ".config/chromium/NativeMessagingHosts", chromium_manifest)
+    register(Path.home() / ".config/google-chrome/NativeMessagingHosts", chromium_manifest)
+    print(f"Firefox: load {ROOT / 'extensions' / 'audio'} and {ROOT / 'extensions' / 'video'} as signed add-ons.")
+    print(f"Chromium: load unpacked {ROOT / 'extensions' / 'audio'} and {ROOT / 'extensions' / 'video'}.")
+    print("Restart Firefox and Chromium after loading the extensions.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Create clean ZIP files for submitting the browser add-ons to AMO."""
+
+import json
+from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+EXTENSIONS = ROOT / "extensions"
+OUTPUT = ROOT / "packages" / "amo-upload"
+
+
+def main():
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    for name in ("audio", "video"):
+        source = EXTENSIONS / name
+        manifest_path = source / "manifest.json"
+        if not manifest_path.is_file():
+            raise FileNotFoundError(f"Missing extension manifest: {manifest_path}")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        archive = OUTPUT / f"yt-dlp-{name}-upload.zip"
+        with ZipFile(archive, "w", ZIP_DEFLATED) as package:
+            for path in sorted(source.rglob("*")):
+                if path.is_file():
+                    package.write(path, path.relative_to(source))
+        with ZipFile(archive) as package:
+            if "manifest.json" not in package.namelist():
+                raise RuntimeError(f"Package is missing manifest.json: {archive}")
+        print(f"Created {archive} for {manifest['name']}")
+
+
+if __name__ == "__main__":
+    main()

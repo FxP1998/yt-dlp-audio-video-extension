@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "yt-dlp Video",
+  "version": "1.0.0",
+  "description": "One-click YouTube video downloads, capped at 1440p.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzsUms4LYdHdiUc1ywTVVUUF1Q2A2wl+LLY5p1Gf//vQE+ZAq9EU/4vi8TlaVNV6Z7Nh+2dgeEfbfFrPKpwo2k5HoUA3avd2vhWvW2ZdfwpfqmUclzfQSGl3k1eYfV/UcbVugDGA1abNGfk1nXHB31p2ODm8HKA98myASnHgXqgKt0qKzoPTKi/Jt6UgvhmP1rN7RXX4vLT3FWC9FOIYarnLHUNNOxc41F0Qt41vye73UtGjollq5iPFrzVr8RNkD0mtphAZkdPRreTPDepb4bhHelUPP0MIDvpPp5GjaKauWnWlQk9hlxQJfr1gYOH0cITnaMjIpIKI49ci22duclQIDAQAB",
+  "permissions": [
+    "activeTab",
+    "nativeMessaging",
+    "notifications"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "service_worker": "background.js",
+    "preferred_environment": ["service_worker", "document"]
+  },
+  "action": {
+    "default_title": "Download YouTube video (max 1440p)"
+  },
+  "icons": {
+    "128": "icons/video-128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "data_collection_permissions": {
+        "required": ["none"]
+      },
+      "id": "yt-dlp-video@broken.local",
+      "strict_min_version": "136.0"
+    }
+  }
+}

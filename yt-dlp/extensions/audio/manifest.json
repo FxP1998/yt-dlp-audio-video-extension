@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "yt-dlp Audio",
+  "version": "1.0.0",
+  "description": "One-click best-quality YouTube audio downloads.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3DeQ/IG8/tkGWd74ZeOkcmmJYZge8GFG2RRUeqNuH04XRPKZgAmyzGfPQTtKVrX9LaNpqQcy52Jg7jxQahLWnXks3D9bF0N22X8zc1DrFV43HF3WPSG5sdwV1C9S8k/Wunz+7n6fy2YcjGkLJhGDPh2j94BJxawAYcbEItWM1NvWO/fWgkYeYwice0efHeuKJyYjezNUr86dHO1sXiIBs6JFWI+PC66vaH47RmkAyfvu29j5NGj7smxM5SqDv353kYfy/lDkPvAaOPXEv74ACu4YUkZKc71cG1Y7tRHVatWIIAP3qZ7GnUWB/V10BXmj0JP8B92yZEt+++6VU+QXEQIDAQAB",
+  "permissions": [
+    "activeTab",
+    "nativeMessaging",
+    "notifications"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "service_worker": "background.js",
+    "preferred_environment": ["service_worker", "document"]
+  },
+  "action": {
+    "default_title": "Download YouTube audio"
+  },
+  "icons": {
+    "128": "icons/audio-128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "data_collection_permissions": {
+        "required": ["none"]
+      },
+      "id": "yt-dlp-audio@broken.local",
+      "strict_min_version": "136.0"
+    }
+  }
+}
