@@ -1,51 +1,106 @@
-# yt-dlp one-click browser downloaders
+# yt-dlp Audio & Video Browser Downloader
 
-Two browser extensions send the current YouTube tab to a local `yt-dlp` native
-host. The Audio extension downloads the best available audio as Opus and embeds
-the thumbnail. The Video extension downloads the best available video at or
-below 1440p. Both show progress and completion in browser notifications.
+Detailed setup and operations guide for
+[`FxP1998/yt-dlp-audio-video-extension`](https://github.com/FxP1998/yt-dlp-audio-video-extension).
+For the project overview and quick start, see the [repository root
+README](../README.md).
 
-This project currently includes a **Linux native host installer** and browser
-extension sources for Firefox and Chromium-based browsers. It is not a
-cross-platform native-host installer: Windows and macOS need their own native
-host registration and setup.
+## Contents
 
-## Project layout
+- [Overview and architecture](#overview-and-architecture)
+- [Project files](#project-files)
+- [Requirements and packages](#requirements-and-packages)
+- [Install on Linux](#install-on-linux)
+- [Install extensions in browsers](#install-extensions-in-browsers)
+- [Download media](#download-media)
+- [Quality and output behavior](#quality-and-output-behavior)
+- [Updates and packaging](#updates-and-packaging)
+- [Troubleshooting](#troubleshooting)
+- [Uninstall](#uninstall)
+- [Privacy and responsible use](#privacy-and-responsible-use)
+
+## Overview and architecture
+
+The project provides two browser extensions: **yt-dlp Audio** and **yt-dlp
+Video**. Click an extension's toolbar icon on an active YouTube video page to
+start a download. Progress and completion are shown using browser
+notifications.
+
+```text
+YouTube tab
+    -> Audio or Video extension
+    -> Browser Native Messaging API
+    -> native/linux/host
+    -> bin/download
+    -> yt-dlp + FFmpeg
+    -> ~/Downloads/yt-dlp/Audio or Videos
+```
+
+The native host validates requests and accepts HTTPS YouTube URLs only from
+the configured extension IDs. The host starts the downloader locally and
+relays progress events back to the extension. This project does not provide a
+remote download service.
+
+The included native-host installer supports **Linux**. Windows and macOS
+require their own native-host installation and registration; this repository
+does not currently include installers for those systems.
+
+## Project files
 
 ```text
 yt-dlp/
 ├── README.md
-├── install.sh                    # Checks dependencies and registers native host
+├── install.sh                    # Linux dependency checks and setup
 ├── bin/
-│   └── download                  # CLI downloader
+│   └── download                  # CLI downloader used by the host
 ├── extensions/
 │   ├── audio/                    # Audio extension source
 │   └── video/                    # Video extension source
 ├── native/
 │   └── linux/
-│       ├── host                  # Native Messaging host
-│       └── install               # Registers the native host for browsers
+│       ├── host                  # Native Messaging bridge
+│       └── install               # Registers the bridge with browsers
 ├── packages/
-│   └── amo-upload/               # ZIPs prepared for AMO submissions
+│   └── amo-upload/               # ZIP archives submitted to AMO
 └── tools/
-    └── package-extensions        # Rebuilds the AMO upload ZIPs
+    └── package-extensions        # Rebuilds the AMO submission archives
 ```
 
-Keep this whole directory in a permanent location. The native host manifest
-contains its absolute path; if you move the project later, run the installer
-again.
+Keep the whole project at a permanent path. The browser's native-host
+registration stores an absolute path to `native/linux/host`; the host locates
+`bin/download` relative to itself. Moving the project requires rerunning
+`./install.sh`.
 
-## Requirements
+## Requirements and packages
 
-- Linux with Python 3.
+Required:
+
+- Linux and Python 3.
 - `yt-dlp` available on `PATH`.
-- `ffmpeg` available on `PATH` (also provides `ffprobe`).
-- Python package `mutagen`, available to the Python installation used for
-  `yt-dlp`; it is needed to embed the audio thumbnail.
-- Node.js is recommended for yt-dlp's YouTube JavaScript challenge support.
-- Firefox 136 or newer, or Chromium.
+- `ffmpeg` and `ffprobe` available on `PATH`.
+- Python package `mutagen`, importable by the Python environment used by
+  yt-dlp. Mutagen is needed to embed thumbnail artwork in audio.
+- Firefox 136 or newer, Chromium, or Google Chrome.
 
-Install dependencies using your distribution's packages. For example:
+Recommended:
+
+- Node.js, for YouTube JavaScript challenge support and access to available
+  formats.
+
+Verify the tools:
+
+```sh
+python3 --version
+yt-dlp --version
+ffmpeg -version
+ffprobe -version
+node --version
+python3 -c 'import mutagen; print(mutagen.version_string)'
+```
+
+Node.js is optional, but without a supported JavaScript runtime YouTube may
+return fewer formats or extraction may fail. The other dependencies are
+needed for the corresponding download and post-processing features.
 
 ### Arch Linux
 
@@ -61,79 +116,128 @@ sudo apt update
 sudo apt install yt-dlp ffmpeg python3-mutagen nodejs
 ```
 
-If the distribution's `yt-dlp` package is missing or too old, install a current
-version using your distribution's recommended method, and make sure the
-`yt-dlp` command resolves on `PATH`. The downloader needs `mutagen` in the same
-Python environment as yt-dlp; an isolated yt-dlp install may need mutagen
-installed into that same environment.
+On another distribution, install equivalent packages using its package
+manager. If the repository's yt-dlp package is outdated, update yt-dlp using
+the same installation method you originally used.
 
-Check the prerequisites:
+**Python environment note:** Mutagen must be importable in the Python
+environment that runs yt-dlp. If yt-dlp is installed in an isolated
+environment, install Mutagen into that environment rather than relying on a
+different system Python.
+
+## Install on Linux
+
+### Clone the repository
+
+Clone the repository using HTTPS:
 
 ```sh
-python3 --version
-yt-dlp --version
-ffmpeg -version
-node --version
-python3 -c 'import mutagen; print(mutagen.version_string)'
+mkdir -p ~/Applications
+cd ~/Applications
+git clone https://github.com/FxP1998/yt-dlp-audio-video-extension.git
+cd yt-dlp-audio-video-extension/yt-dlp
 ```
 
-The last command must succeed for audio downloads with an embedded thumbnail.
+If using the GitHub **Download ZIP** option, extract the repository and open
+a terminal in its `yt-dlp/` directory.
 
-## Install on another Linux system
+### Run the installer
 
-1. Copy the complete `yt-dlp` project directory to a permanent location, such
-   as `~/Applications/yt-dlp`. Do not copy only the extensions: the native host
-   launches `bin/download`.
-2. Run the installer:
+```sh
+./install.sh
+```
 
-   ```sh
-   cd ~/Applications/yt-dlp
-   ./install.sh
-   ```
+Run the script as your regular user—**do not use `sudo ./install.sh`**. It:
 
-   It checks for `yt-dlp`, `ffmpeg`, and `mutagen`. If required packages are
-   missing on Arch Linux or Debian/Ubuntu, it asks before installing them with
-   the system package manager. It then creates per-user native-messaging
-   manifests for Firefox, Chromium, and Google Chrome. The script itself must
-   be run as your normal user, not with `sudo`.
+1. Checks that the downloader and native-host helper files are present.
+2. Checks for `yt-dlp`, `ffmpeg`, and Python `mutagen`.
+3. Detects Arch Linux or Debian/Ubuntu if dependencies are missing.
+4. Asks for confirmation before installing packages through the system
+   package manager; package installation may request your password via `sudo`.
+5. Marks the helper scripts executable.
+6. Registers the native host for Firefox, Chromium, and Google Chrome.
+7. Prints the extension folders and browser setup instructions.
 
-3. Install the extensions in the browser:
+The installer is safe to run again; it rewrites the same per-user host
+registrations. Node.js is recommended but optional. If it is absent, the
+installer displays a notice.
 
-   **Firefox:** Install the signed Audio and Video add-ons from their AMO
-   pages, or install their signed `.xpi` files through `about:addons` → gear
-   menu → **Install Add-on From File…**. The unsigned source folders in this
-   project are for development and cannot be permanently installed in normal
-   Firefox. AMO signing and publication are separate from installing the
-   native host.
+If you install all prerequisites manually or use a distribution the installer
+does not detect, register the host manually:
 
-   **Chromium / Google Chrome:** Open `chrome://extensions`, enable
-   **Developer mode**, choose **Load unpacked**, and select each folder:
+```sh
+chmod +x bin/download native/linux/host native/linux/install
+python3 native/linux/install
+```
 
-   ```text
-   ~/Applications/yt-dlp/extensions/audio
-   ~/Applications/yt-dlp/extensions/video
-   ```
+The installer creates these per-user registration files:
 
-   Loading unpacked is the development/personal-install method. Keep the
-   project at the same path so the native-host registration remains valid.
+```text
+~/.mozilla/native-messaging-hosts/com.broken.ytdlp.json
+~/.config/chromium/NativeMessagingHosts/com.broken.ytdlp.json
+~/.config/google-chrome/NativeMessagingHosts/com.broken.ytdlp.json
+```
 
-5. Restart the browser, pin the two toolbar icons, open a YouTube video, and
-   click **yt-dlp Audio** or **yt-dlp Video**. A notification reports
-   preparation, download percentage, and success/failure.
+They point to the absolute path of `native/linux/host`. Do not move or rename
+the project after registration without running `./install.sh` again.
 
-Firefox's temporary **Load Temporary Add-on** option is only for testing and
-the extension disappears when Firefox closes. For automatic installation at
-startup, install a signed XPI through AMO or configure Firefox enterprise
-policies (`ExtensionSettings`) to install that signed XPI. A raw manifest or
-unpacked extension cannot be made permanent by a startup script in normal
-Firefox.
+## Install extensions in browsers
 
-### Optional: install signed Firefox XPIs at startup with policy
+### Chromium and Google Chrome
 
-This is for a locally managed Linux Firefox installation. First download the
-signed Audio and Video `.xpi` files from AMO and put them in a stable readable
-location. Then create `/etc/firefox/policies/policies.json` (replace
-`YOUR_USER` and the two XPI paths with your real absolute paths):
+The included Chromium extension source can be loaded unpacked for personal
+use:
+
+1. Open `chrome://extensions`.
+2. Turn on **Developer mode**.
+3. Choose **Load unpacked**.
+4. Select `extensions/audio/`.
+5. Repeat **Load unpacked** and select `extensions/video/`.
+6. Pin the Audio and Video icons from the extensions menu.
+7. Restart the browser after registering the native host.
+
+After changing extension code, return to `chrome://extensions` and click
+**Reload** for each extension. Google Chrome and Chromium use separate
+Native Messaging directories; `./install.sh` registers both.
+
+### Firefox
+
+Install each signed add-on from its AMO page, or use the signed `.xpi` files
+downloaded from AMO:
+
+1. Open `about:addons`.
+2. Open the gear menu and choose **Install Add-on From File…**.
+3. Select the signed Audio `.xpi`.
+4. Repeat for the signed Video `.xpi`.
+5. Pin both extensions and restart Firefox.
+
+The `extensions/audio/` and `extensions/video/` folders are source code, not
+signed Firefox installers. Loading them through `about:debugging` is temporary;
+they disappear when Firefox closes. The files under `packages/amo-upload/`
+are ZIP submission archives for AMO and **are not signed `.xpi` files**.
+
+The Firefox extension IDs must match the `allowed_extensions` entries in the
+native-host manifest:
+
+```text
+yt-dlp-audio@broken.local
+yt-dlp-video@broken.local
+```
+
+If a signed extension has a different ID, update the Firefox allow-list in
+`native/linux/install`, register the host again, and ensure the add-on's
+manifest ID matches the signed extension.
+
+### Optional: automatic Firefox installation with policy
+
+For a locally managed Linux Firefox installation, the Firefox
+`ExtensionSettings` policy can install signed XPIs at startup. Installing
+the add-ons from AMO normally is simpler and handles updates through AMO.
+
+First download both signed `.xpi` files from AMO and place them in stable,
+readable locations. Then create `/etc/firefox/policies/policies.json`.
+Replace `YOUR_USER` and the file paths below with the actual home-directory
+name and paths:
 
 ```sh
 sudo install -d -m 755 /etc/firefox/policies
@@ -143,11 +247,11 @@ sudo tee /etc/firefox/policies/policies.json >/dev/null <<'JSON'
     "ExtensionSettings": {
       "yt-dlp-audio@broken.local": {
         "installation_mode": "normal_installed",
-        "install_url": "file:///home/YOUR_USER/Applications/yt-dlp/packages/yt-dlp-audio.xpi"
+        "install_url": "file:///home/YOUR_USER/Applications/yt-dlp-audio.xpi"
       },
       "yt-dlp-video@broken.local": {
         "installation_mode": "normal_installed",
-        "install_url": "file:///home/YOUR_USER/Applications/yt-dlp/packages/yt-dlp-video.xpi"
+        "install_url": "file:///home/YOUR_USER/Applications/yt-dlp-video.xpi"
       }
     }
   }
@@ -155,91 +259,201 @@ sudo tee /etc/firefox/policies/policies.json >/dev/null <<'JSON'
 JSON
 ```
 
-Restart Firefox and visit `about:policies` to confirm the policy loaded. The
-IDs in this example must match the signed add-ons. Keep the XPI files at those
-paths; Firefox reads them when applying the policy. This policy is optional:
-installing the signed add-ons from AMO normally is simpler and allows AMO to
-handle updates.
+Restart Firefox and visit `about:policies` to confirm the policy loaded.
+Use the exact IDs and absolute file URLs of your signed add-ons, and keep the
+XPI files at those paths. Firefox policy locations can vary by Linux
+distribution.
 
-## Command-line use
+## Download media
 
-Quote URLs that contain `?` or `&` so the shell does not treat them as glob or
-background-job syntax:
+### One-click browser downloads
 
-```sh
-./bin/download audio 'https://www.youtube.com/watch?v=VIDEO_ID'
-./bin/download video 'https://youtu.be/VIDEO_ID'
-```
+1. Open a YouTube video page (not a playlist or unrelated website).
+2. Click the pinned **yt-dlp Audio** or **yt-dlp Video** icon.
+3. Follow browser notifications for preparation, download percentage, and
+   completion or errors.
 
-Files go to:
+Audio and Video have independent download connections. Files go to:
 
 ```text
 ~/Downloads/yt-dlp/Audio/
 ~/Downloads/yt-dlp/Videos/
 ```
 
-Use browser cookies for videos that require an authenticated session:
+### Command-line downloads
+
+Run commands from this `yt-dlp/` directory:
 
 ```sh
-./bin/download video --browser firefox 'https://www.youtube.com/watch?v=VIDEO_ID'
-./bin/download audio --browser chromium 'https://www.youtube.com/watch?v=VIDEO_ID'
+./bin/download audio 'https://www.youtube.com/watch?v=VIDEO_ID'
+./bin/download video 'https://youtu.be/VIDEO_ID'
 ```
 
-`--profile PROFILE` can select a named browser profile when using `--browser`.
-`--simulate` checks extraction and format selection without downloading media.
+Quote URLs that contain `?` or `&`; zsh and other shells may interpret those
+characters as patterns or background-job operators.
 
-## Quality and format behavior
+The destination directories are created automatically. To use another output
+root:
 
-- **Audio:** selects yt-dlp's best available audio stream, extracts Opus at
-  best quality without re-encoding when the source is already Opus, embeds
-  metadata and the thumbnail. Files use the `.opus` extension.
-- **Video:** selects the best available video stream with height at most
-  1440p and the best audio stream, then merges them. If the source is below
-  1440p, it downloads the best available lower resolution.
-- Output is separated by mode so audio and video with the same title do not
-  overwrite each other.
+```sh
+./bin/download video --output-dir ~/Media 'https://youtu.be/VIDEO_ID'
+```
 
-## Updating and packaging
+This writes video files under `~/Media/Videos/`.
 
-After changing extension source code, rebuild the AMO submission archives:
+### Simulate format selection
+
+Check which format yt-dlp selects without downloading media:
+
+```sh
+./bin/download audio --simulate 'https://youtu.be/VIDEO_ID'
+./bin/download video --simulate 'https://youtu.be/VIDEO_ID'
+```
+
+Simulation verifies extraction and format choice, but does not verify
+post-processing or thumbnail embedding.
+
+### Use browser cookies
+
+For videos requiring an authenticated session, yt-dlp can read cookies from
+Firefox or Chromium:
+
+```sh
+./bin/download audio --browser firefox 'https://www.youtube.com/watch?v=VIDEO_ID'
+./bin/download video --browser chromium 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+To choose a browser profile:
+
+```sh
+./bin/download video --browser chromium --profile Default 'https://youtu.be/VIDEO_ID'
+```
+
+`--profile` requires `--browser`. If cookie access fails while the browser is
+open, close the browser and retry. Some encrypted browser profiles may require
+additional OS configuration.
+
+## Quality and output behavior
+
+### Audio
+
+- Selects yt-dlp's best available audio-only format.
+- Extracts `.opus` audio using FFmpeg and best conversion quality.
+- When the selected source is already Opus, yt-dlp can generally copy the
+  encoded audio rather than re-encode it. Converting another codec to Opus is
+  lossy.
+- Embeds metadata and the video's thumbnail. This requires Mutagen and FFmpeg.
+
+### Video
+
+- Selects the best video stream with a height of at most **1440 pixels** and
+  the best available audio stream.
+- If 1440p is unavailable, selects the best available lower resolution.
+- Merges separate audio/video streams with FFmpeg. The final container and
+  filename extension depend on the selected streams.
+- Does not request thumbnail embedding in video files.
+
+Audio and video are stored in separate folders, so downloading both for the
+same video does not overwrite one with the other.
+
+## Update and package extensions
+
+After changing files in `extensions/audio/` or `extensions/video/`, rebuild
+the AMO submission ZIPs:
 
 ```sh
 ./tools/package-extensions
 ```
 
-Upload the resulting files from `packages/amo-upload/` as new AMO versions.
-These ZIPs are **submission packages**, not the signed Firefox add-ons. Install
-the signed `.xpi` supplied by AMO in Firefox. Chromium loads the unpacked
-extension source folders above.
+Generated archives:
 
-After moving this project or changing extension IDs, re-register the native
-host by running `python3 native/linux/install`. If an ID changes, update the
-allow-lists in `native/linux/install` and `native/linux/host`, rebuild the
-packages, and submit/sign the changed Firefox versions.
+```text
+packages/amo-upload/yt-dlp-audio-upload.zip
+packages/amo-upload/yt-dlp-video-upload.zip
+```
+
+Upload these ZIPs as new versions in AMO. After signing/approval, download
+the signed `.xpi` files for Firefox. For Chromium, reload the unpacked
+extensions from `chrome://extensions`.
+
+If the project directory moves, rerun:
+
+```sh
+./install.sh
+```
+
+If an extension ID changes, update its manifest and the allow-lists in
+`native/linux/install` and `native/linux/host`, then rerun the installer,
+rebuild the ZIPs, and reload/re-submit the affected extension. The Chromium
+`key` fields in the extension manifests establish stable Chromium IDs; do
+not casually remove or replace them.
 
 ## Troubleshooting
 
-- **“This extension is not allowed”**: the running browser extension ID is
-  absent from the native host allow-list. Install the Audio/Video builds from
-  this project/AMO and rerun `python3 native/linux/install`.
-- **“Specified native messaging host not found”**: check that the native host
-  manifest exists under `~/.mozilla/native-messaging-hosts/` or the browser's
-  `NativeMessagingHosts/` directory; rerun the installer and restart the
-  browser.
-- **“Native helper failed”**: confirm `native/linux/host` and `bin/download`
-  are executable, and that `yt-dlp` and `ffmpeg` resolve on `PATH`.
-- **Audio thumbnail/post-processing failure**: install `mutagen` into the
-  Python environment used by yt-dlp, then retry the download.
-- **YouTube extraction reports missing formats or a JavaScript challenge**:
-  install Node.js and update yt-dlp using the method used to install it.
-- **Progress notifications are missing**: allow browser/desktop notifications
-  for the browser in system settings.
-- **Moved the project**: rerun the native-host installer from its new location
-  and restart the browser.
+### “This extension is not allowed”
+
+The native host did not recognize the caller's extension ID. Confirm that the
+intended Audio/Video add-on is installed, rerun `./install.sh`, and restart
+the browser. Do not change the extension IDs or Chromium manifest keys unless
+you also update the host allow-lists.
+
+### “Specified native messaging host not found”
+
+Check the registration for the browser you are using:
+
+```sh
+ls -l ~/.mozilla/native-messaging-hosts/com.broken.ytdlp.json
+ls -l ~/.config/chromium/NativeMessagingHosts/com.broken.ytdlp.json
+ls -l ~/.config/google-chrome/NativeMessagingHosts/com.broken.ytdlp.json
+```
+
+Run `./install.sh` again and restart the browser. If you moved the repository,
+make sure you ran the installer from its new location.
+
+### Native helper does not start
+
+Verify executable permissions and dependencies:
+
+```sh
+ls -l bin/download native/linux/host native/linux/install
+command -v yt-dlp
+command -v ffmpeg
+command -v ffprobe
+python3 -c 'import mutagen'
+```
+
+### Audio thumbnail or post-processing failed
+
+Check FFmpeg and Mutagen:
+
+```sh
+ffmpeg -version
+python3 -c 'import mutagen; print(mutagen.version_string)'
+```
+
+On Arch, install Mutagen with `sudo pacman -S python-mutagen`; on Debian or
+Ubuntu use `sudo apt install python3-mutagen`. If yt-dlp uses an isolated
+Python environment, install Mutagen in that same environment.
+
+### YouTube formats are missing or extraction fails
+
+Update yt-dlp and install Node.js. This downloader automatically selects Node
+when available. Use `--simulate` to see which formats yt-dlp currently
+selects.
+
+### Progress notifications do not appear
+
+Allow desktop notifications for Firefox or Chromium in your operating
+system's notification settings.
+
+### A download seems stuck
+
+Wait for its completion or failure notification. If needed, close and restart
+the browser before retrying. Audio and Video downloads are independent.
 
 ## Uninstall
 
-Remove the registered native host manifests:
+Remove the per-user native-host manifests:
 
 ```sh
 rm -f ~/.mozilla/native-messaging-hosts/com.broken.ytdlp.json
@@ -247,13 +461,16 @@ rm -f ~/.config/chromium/NativeMessagingHosts/com.broken.ytdlp.json
 rm -f ~/.config/google-chrome/NativeMessagingHosts/com.broken.ytdlp.json
 ```
 
-Then remove the two extensions through the browser's extension manager. This
-does not remove downloaded media or system packages.
+Then remove both extensions using the browser's extension manager. This does
+not remove downloaded media, the project directory, or system packages.
 
-## Privacy and usage
+## Privacy and responsible use
 
-The native host only accepts HTTPS YouTube URLs and only from the extension
-IDs in its allow-list. Downloads run locally using the installed yt-dlp; the
-extensions do not upload the video URL to a project server. Use the downloader
-only for content you are authorized to download and in accordance with the
-applicable service terms and local law.
+The host accepts HTTPS YouTube URLs only and only from the configured
+extension IDs. The browser extensions do not upload URLs to a project server;
+yt-dlp and FFmpeg run locally. Browser cookies are read only when explicitly
+requested with the command-line `--browser` option.
+
+Use this software only for content you are authorized to download and in
+accordance with applicable service terms and local law. The project does not
+grant rights to content hosted by YouTube or other services.
